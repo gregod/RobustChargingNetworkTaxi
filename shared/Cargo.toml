@@ -1,0 +1,33 @@
+[package]
+name = "shared"
+version = "0.1.0"
+authors = ["Gregor Godbersen <git@doamo.de>"]
+edition = "2021"
+
+[dependencies]
+indexmap = "*"
+csv = "*"
+regex = "*"
+multimap = "*"
+dipstick = "*"
+features = "*"
+bitflags = "*"
+superslice = "*"
+noisy_float = "*"
+toml = "*"
+rand="*"
+piecewise-linear="*"
+hashbrown = "*"
+flate2 = "*"
+[features]
+default = ["fast_hash"]
+perf_statistics = []
+fast_hash=[]
+
+[dev-dependencies]
+criterion = "0.3"
+
+
+[[bench]]
+name = "my_benchmark"
+harness = false

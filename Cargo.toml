@@ -1,0 +1,16 @@
+cargo-features = ["named-profiles"]
+
+[workspace]
+members = [
+    "shared",
+    "column_generation"
+]
+
+[profile.release]
+debug = true
+
+[profile.cluster]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+panic = "abort"

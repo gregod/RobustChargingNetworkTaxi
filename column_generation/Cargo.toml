@@ -1,0 +1,65 @@
+[package]
+name = "column_generation"
+version = "0.1.0"
+authors = ["Gregor Godbersen <git@doamo.de>"]
+edition = "2021"
+
+[dependencies]
+
+shared = { path = "../shared" }
+
+typed-arena = "*"
+petgraph = "*"
+ndarray = "*"
+gurobi = "*"
+indexmap = "*"
+chrono = "*"
+rand = "*"
+crossbeam = "*"
+crossbeam-utils = "*"
+crossbeam-deque = "*"
+dipstick = {version="*",optional=true}
+colored = "*"
+ctrlc = "*"
+enum_dispatch = "*"
+snowflake = "*"
+log = "*"
+clap = "*"
+rust_hawktracer= "*"
+itertools = "*"
+timer = "*"
+tempfile="*"
+
+[features]
+default=[]
+
+opt=["column_generation_exit_early","column_generation_sometimes_integer","pattern_generation_improve_cuts"]
+
+snakemake=["opt","benders_debug"]
+profiling_enabled = ["rust_hawktracer/profiling_enabled"]
+perf_statistics=["shared/perf_statistics","profiling_enabled","dipstick"]
+
+column_generation_timeout=[]
+column_generation_sometimes_integer=[]
+
+debug_write_models_to_file=[]
+
+dag_output=[]
+
+
+
+catch_cancel=[]
+progress_bar=[]
+
+column_generation_exit_early=[]
+pattern_generation_improve_cuts=[]
+pattern_generation_debug=[]
+column_generation_debug=["expensive_feasibility_checks","branching_debug"]
+expensive_feasibility_checks=["column_generation_validate"]
+column_generation_validate=[]
+branching_debug=[]
+benders_debug=[]
+benders_lifting_debug=[]
+
+
+infeasibility_events=[]
