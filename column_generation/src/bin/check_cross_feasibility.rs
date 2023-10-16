@@ -88,7 +88,7 @@ pub fn main() {
 
         let num_infeasible_allowed = ((matches.value_of("percent_infeasible_allowed").unwrap().parse::<f64>().unwrap()) * vehicles.len() as f64).round() as usize;
 
-        match CheckFeasibility::has_feasibility_error(&sites, &segments, &vehicles,num_infeasible_allowed)  {
+        match CheckFeasibility::has_feasibility_error(&sites, &segments, vehicles.clone(),num_infeasible_allowed)  {
             None => {
                 println!("{}|{}|FEASIBLE|OK|{}|{}", vehicles_path,trips_path,0,vehicles.len());
             },

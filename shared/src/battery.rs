@@ -89,4 +89,33 @@ impl Battery {
             soc_to_time,
         }
     }
+
+    pub fn get_new_soc_after_distance(&self, current_soc: f64, distance_meters: u32) -> f64 {
+        let factor: f64 = 100.0 / 1000.0 / 100.0 / self.range_in_km;
+        current_soc - (distance_meters as f64 * factor)
+    }
+
+
+    pub fn get_new_soc_after_charging(&self, current_soc: f64, duration_minutes: u8) -> f64 {
+        let time_index = (((self.soc_to_time[0])
+            .mul_add(current_soc, self.soc_to_time[1]))
+            .mul_add(current_soc, self.soc_to_time[2]))
+            .mul_add(current_soc, self.soc_to_time[3]);
+
+        let new_index = time_index + (duration_minutes as f64);
+
+        let new_soc = (((self.time_to_soc[0])
+            .mul_add(new_index, self.time_to_soc[1]))
+            .mul_add(new_index, self.time_to_soc[2]))
+            .mul_add(new_index, self.time_to_soc[3]);
+
+        let new_soc = new_soc
+            .min(self.max_charge)
+            .max(self.min_charge);
+
+        debug_assert!(new_soc >= self.min_charge);
+        debug_assert!(new_soc <= self.max_charge);
+
+        new_soc
+    }
 }

@@ -12,6 +12,9 @@ pub use reachable_site::ReachableSite;
 mod segment;
 pub use segment::Segment;
 
+mod segment_index;
+pub use segment_index::SegmentIndex;
+
 mod site;
 pub use site::Site;
 mod vehicle;
@@ -31,6 +34,9 @@ pub use solution::Simple;
 
 #[cfg(feature = "perf_statistics")]
 mod print_metrics;
+mod vehicle_index;
+pub use vehicle_index::VehicleIndex;
+
 use flate2::read::GzDecoder;
 #[cfg(feature = "perf_statistics")]
 pub use print_metrics::setup_metrics_printer;

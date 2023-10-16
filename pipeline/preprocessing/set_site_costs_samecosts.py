@@ -22,13 +22,13 @@ df.index = df["id"]
 df["cost"] = int(round(df["cost"].mean()))
 
 
-spamwriter = csv.writer(output, delimiter=',',
+csvwriter = csv.writer(output, delimiter=',',
                         quotechar='"', quoting=csv.QUOTE_NONNUMERIC
                         )
-spamwriter.writerow(['id', 'capacity', 'cost', 'location'])
+csvwriter.writerow(['id', 'capacity', 'cost', 'location'])
 
 for index,row in df.iterrows():
-    spamwriter.writerow([row["id"],row["capacity"],row["cost"],row["location"]])
+    csvwriter.writerow([row["id"],row["capacity"],row["cost"],row["location"]])
 
 print(output.getvalue())
 

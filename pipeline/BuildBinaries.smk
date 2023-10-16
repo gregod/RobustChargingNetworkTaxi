@@ -11,6 +11,29 @@ rule build_benders_binary:
     shell:
          "RUSTFLAGS='-C link-arg=-s -C target-cpu=native' cargo +nightly build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin benders --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
 
+rule build_benders_variable_binary:
+    threads: 1
+    resources:
+             cargo=1
+    input:
+         cargo="/home/gregor/Code/et/column_generation/src/bin/benders_variable.rs"
+    output:
+          OUTPUT_PREFIX + "/binaries/benders_variable"
+    shell:
+         "RUSTFLAGS='-C link-arg=-s -C target-cpu=native' cargo +nightly build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin benders_variable --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
+
+rule build_simulation_binary:
+    threads: 1
+    resources:
+             cargo=1
+    input:
+         cargo="/home/gregor/Code/et/column_generation/src/bin/simulation_feasible.rs"
+    output:
+          OUTPUT_PREFIX + "/binaries/simulation_feasible"
+    shell:
+         "RUSTFLAGS='-C link-arg=-s -C target-cpu=native' cargo +nightly build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin simulation_feasible --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
+
+
 
 rule build_robust2_binary:
     threads: 1

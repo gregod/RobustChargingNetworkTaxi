@@ -12,8 +12,8 @@ pub struct Site {
     pub id: u8,
     pub index: usize,
     pub location: Location,
-    pub cost: u8,
-    pub charger_cost: u8,
+    pub cost_4: u8,
+    pub cost_2: u8,
     pub capacity: u8,
 }
 
@@ -65,6 +65,9 @@ impl Site {
                 .parse::<u8>()
                 .unwrap();
             let capacity = record.get(capacity_column).unwrap().parse::<u8>().unwrap();
+
+            assert!(capacity == 4 || capacity == 2);
+
             let cost = record.get(cost_column).unwrap().parse::<u8>().unwrap();
             let location = record.get(location_column).unwrap();
 
@@ -76,12 +79,21 @@ impl Site {
                 .collect();
             let location = Location::new(location_points[0], location_points[1]);
 
+
+            // legacy cost: Originally assumed that
+            // cost is base and each charge point is + 10%
+            // this restores this assumption
+            let old_charger_cost = (f32::from(cost) * 0.1).round() as u8;
+
+            let cost_4 = cost + 4 * old_charger_cost;
+            let cost_2 = (f32::from(cost_4) * 0.67).round() as u8;
+
             let site = Site {
                 id: site_id,
                 index: index_counter,
                 location,
-                cost,
-                charger_cost: (f32::from(cost) * 0.1).round() as u8,
+                cost_4,
+                cost_2 ,
                 capacity,
             };
 

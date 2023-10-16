@@ -64,13 +64,13 @@ def easing_cost(distance_km):
 df["cost"] = df.apply(lambda row: easing_cost(haversine(munich_center,(row["lat"],row["lon"]))/1000), axis=1)
 
 
-spamwriter = csv.writer(output, delimiter=',',
+csvwriter = csv.writer(output, delimiter=',',
                         quotechar='"', quoting=csv.QUOTE_NONNUMERIC
                         )
-spamwriter.writerow(['id', 'capacity', 'cost', 'location'])
+csvwriter.writerow(['id', 'capacity', 'cost', 'location'])
 
 for index,row in df.iterrows():
-    spamwriter.writerow([row["id"],row["capacity"],row["cost"],row["location"]])
+    csvwriter.writerow([row["id"],row["capacity"],row["cost"],row["location"]])
 
 print(output.getvalue())
 

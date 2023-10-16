@@ -5,6 +5,8 @@ use crate::fixed_size::brancher::{Brancher, SolveError};
 use crate::fixed_size::site_conf::{SiteConfFactory};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use grb::{Env,param};
+use crate::pattern_pool::PatternPool;
 
 pub struct CheckFeasibility {
 
@@ -12,7 +14,7 @@ pub struct CheckFeasibility {
 
 impl CheckFeasibility{
 
-    pub fn has_feasibility_error<'a>(sites: &'a IndexMap<u8, Site>, _segments_: &'a IndexMap<u32, Segment<'a>>, vehicles: &'a [Vehicle<'a>], num_infeasible_allowed : usize) -> Option<SolveError> {
+    pub fn has_feasibility_error<'a>(sites: &'a IndexMap<u8, Site>, _segments_: &'a IndexMap<u32, Segment<'a>>, vehicles: Vec<Vehicle<'a>>, num_infeasible_allowed : usize) -> Option<SolveError> {
 
         let site_array: Vec<Site> = sites.into_iter().map(|(_i,site)| site.clone()).collect();
         let site_conf_factory = SiteConfFactory {
@@ -25,13 +27,35 @@ impl CheckFeasibility{
         for (site, conf) in site_array.iter().zip(site_conf.iter_mut()) {
             *conf = site.capacity;
         }
+        let mut env = Env::new("").unwrap();
+        env.set(param::Threads, 1).unwrap();
+        // 2= barrier; test with concurrent has shown that
+        // this usually wins!
+        env.set(param::Method, 2).unwrap();
+        env.set(param::Seed, 12345).unwrap();
+        env.set(param::LogToConsole, 0).unwrap();
+
+
+        // set low time limit; we mainly want the integer solution by branching this function is only for quick wins;
+        let mut env_integer = Env::new("").unwrap();
+        env_integer.set(param::Threads, 1).unwrap();
+        env_integer.set(param::Seed, 12345).unwrap();
+        env_integer.set(param::LogToConsole, 0).unwrap();
+        env_integer.set(param::TimeLimit, 20.0).unwrap();
+
+
+        let num_vehicles = vehicles.len();
 
         let mut brancher = Brancher::new(
             site_array,
             vehicles,
             site_conf,
+            &env,
+            &env_integer,
             num_infeasible_allowed,
-            Arc::new(AtomicBool::new(false))
+            false,
+            Arc::new(AtomicBool::new(false)),
+            PatternPool::new(num_vehicles)
         );
 
         match brancher.solve(false, true) {
@@ -41,10 +65,10 @@ impl CheckFeasibility{
 
     }
 
-    pub fn get_potentially_feasible<'a>(sites: &'a IndexMap<u8, Site>, _segments: &'a IndexMap<u32, Segment<'a>>, vehicles: &'a [Vehicle<'a>]) -> Vec<Vehicle<'a>> {
+    pub fn get_potentially_feasible<'a>(sites: &'a IndexMap<u8, Site>, _segments: &'a IndexMap<u32, Segment<'a>>, vehicles: &'a [Vehicle<'a>]) -> Vec<&'a Vehicle<'a>> {
             let site_conf_factory = SiteConfFactory {
                 num_sites : sites.len()
             };
-            Brancher::get_vehicles_that_can_be_feasible(vehicles,site_conf_factory)
+            Brancher::get_vehicles_that_can_be_feasible(vehicles.iter(),site_conf_factory.full(1))
     }
 }

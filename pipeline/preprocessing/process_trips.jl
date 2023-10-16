@@ -122,7 +122,7 @@ out_dft = @byrow!(dft, begin
     free_time = :endPeriod - :startPeriod + 1
 
 
-    dist = round(lookup[(:startPoint[1],:startPoint[2],:endPoint[1],:endPoint[2])][2])
+    (dur,dist) = round.(lookup[(:startPoint[1],:startPoint[2],:endPoint[1],:endPoint[2])][2])
 
     @assert(dist <= 100000)
     :osmDistance = dist

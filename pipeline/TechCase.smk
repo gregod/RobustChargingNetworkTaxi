@@ -1,7 +1,7 @@
 include: "common.smk"
 
 TC_BASE_BATTERY = "battery_1"
-
+DAY_RANGE=["{:02}".format(i) for i in range(1,31 +1) ]
 
 rob_seeds_strat=config["robust"]["seeds"]
 rob_groups_strat=config["robust"]["groups"]
@@ -13,7 +13,7 @@ rule tc_calculate_battery:
     resources:
         runtime=3600
     input:
-        battery="input_data/" + RC_BASE_BATTERY +".toml",
+        battery="input_data/" + TC_BASE_BATTERY +".toml",
         script="preprocessing/create_rc_battery.py"
     output:
         battery=OUTPUT_PREFIX + "/preprocessed/raw_dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}.toml"

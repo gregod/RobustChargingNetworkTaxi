@@ -107,7 +107,6 @@ rule check_cross_feasibilty_of_cross:
          "{input.binary}  {input.active_sites} {input.trips} {input.vehicles} | grep -v '^Academic license' > {output}"
 
 rule create_projection_to_larger_step_cross:
-
     input:
          script="preprocessing/project_between_stepped_sites.py",
          larger_set=find_taxi_step,

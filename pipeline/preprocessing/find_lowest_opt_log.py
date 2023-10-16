@@ -1,11 +1,6 @@
-import pandas as pd
 import re
 import sys
-import csv
-import io
-import sys
 
-from statistics import  median
 
 log_files = sys.argv[1:]
 

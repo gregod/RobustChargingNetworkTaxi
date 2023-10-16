@@ -6,6 +6,8 @@ members = [
     "column_generation"
 ]
 
+
+
 [profile.release]
 debug = true
 

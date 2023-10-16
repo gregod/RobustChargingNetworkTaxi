@@ -16,32 +16,26 @@ use petgraph::dot::Dot;
 use ndarray::Array2;
 use crate::fixed_size::site_conf::SiteConf;
 
-use crate::CG_EPSILON;
-use crate::branching_filter::BranchingFilter;
+use crate::{CG_EPSILON, SegmentId, SiteIndex};
+use crate::branching_filter::{BranchingFilter, DataFloat};
 use petgraph::prelude::EdgeRef;
 
 
-#[derive(Clone, Debug)]
-struct Label<'a> {
-    current_node: NodeIndex,
-    soc: f64,
-    parent_label: Option<&'a Label<'a>>,
-    collected_edge_duals: f64
-}
 
 pub struct EdgeWeight {
-    distance_m: u32, // distance that is driven
-    charge_duration_minutes : u8,
+    pub(crate) distance_m: u32, // distance that is driven
+    pub(crate) charge_duration_minutes : u8,
     start_of_charge : bool,
-    edge_dual_term: Rc<Cell<f64>>,
+    pub(crate) edge_dual_term: Rc<Cell<f64>>,
 }
 
 #[derive(Debug,Clone)]
 pub struct NodeWeight<'a> {
     title: String,
-    segment: Option<&'a Segment<'a>>,
-    site: Option<&'a ReachableSite<'a>>,
-    charge_period: Option<Period>,
+    pub(crate) segment: Option<&'a Segment<'a>>,
+    pub(crate) site: Option<&'a ReachableSite<'a>>,
+    pub(crate) charge_period: Option<Period>,
+    pub(crate) time_period : Period
 }
 
 impl<'a> NodeWeight<'a> {
@@ -102,7 +96,7 @@ pub fn save_dag(name : &str, dag : &Graph<NodeWeight, EdgeWeight, petgraph::Dire
     Build a DAG of the vehicles choices with reduced costs attached to the nodes
 */
 
-pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, site_period_duals : Rc<Array2<Rc<Cell<f64>>>>, charge_filters : &[BranchingFilter<'a>], site_sizes : SiteConf) ->  (NodeIndex<u32>, NodeIndex<u32>, Graph<NodeWeight<'s>, EdgeWeight, petgraph::Directed>) {
+pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, site_period_duals : Rc<Array2<Rc<Cell<f64>>>>, charge_filters : &[BranchingFilter], site_sizes : SiteConf) ->  (NodeIndex<u32>, NodeIndex<u32>, Graph<NodeWeight<'s>, EdgeWeight, petgraph::Directed>) {
 
     let mut dag = Graph::<NodeWeight, EdgeWeight, petgraph::Directed>::new();
 
@@ -112,6 +106,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
         site: None,
         segment: None,
         charge_period: None,
+        time_period : 0,
     });
 
     let destination = dag.add_node(NodeWeight {
@@ -119,6 +114,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
         site: None,
         segment: None,
         charge_period: None,
+        time_period : MAX_PERIOD as Period,
     });
 
 
@@ -136,6 +132,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
             site: None,
             segment: Some(segment),
             charge_period: None,
+            time_period : segment.stop_time
         });
 
         let trip_start;
@@ -149,6 +146,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                     site: None,
                     segment: Some(segment),
                     charge_period: None,
+                    time_period : segment.start_time
                 });
 
                 // connect dummy start node to root node
@@ -169,14 +167,16 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
             let filters = charge_filters.iter().filter(|filter| {
                 match filter {
                     BranchingFilter::ChargeSegmentSite(_, filter_segment, _, _) => {
-                        filter_segment == segment
+                        *filter_segment == SegmentId::new(segment)
                     }
                     BranchingFilter::ChargeSegmentSiteTime(_, filter_segment, _, _, _) => {
-                        filter_segment == segment
+                        *filter_segment == SegmentId::new(segment)
                     }
                     BranchingFilter::OpenSite(_filter_site,_typ) => true, // not segment specific
                     BranchingFilter::OpenSiteGroupMax(_,_) => true, // not segment specific
                     BranchingFilter::OpenSiteGroupMin(_,_) => true, // not segment specific
+                    BranchingFilter::MasterNumberOfCharges(_,_,_,_) => true, // master number of charges does not influence single patterns,
+                    BranchingFilter::MasterMustUseColumn(_, _, _) => true // master must use pattern does not influence single patterns
                 }
             }).collect::<Vec<&BranchingFilter>>();
 
@@ -191,6 +191,8 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                     BranchingFilter::OpenSite(_filter_site,_typ) => false, // a open or closed site is no charging filter
                     BranchingFilter::OpenSiteGroupMax(_,_) => false,  // a open or closed site is no charging filter
                     BranchingFilter::OpenSiteGroupMin(_,_) => false,  // a open or closed site is no charging filter
+                    BranchingFilter::MasterNumberOfCharges(_,_,_,_) => false, // master number of charges does not influence single patterns,
+                    BranchingFilter::MasterMustUseColumn(_, _, _) => false // master must use pattern does not influence single patterns
                 }
             });
 
@@ -209,8 +211,10 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                     BranchingFilter::OpenSite(_filter_site,_typ) => None, // cosed sites should be excluded from dag!
                     BranchingFilter::OpenSiteGroupMax(_,_) => None,  // a open or closed site is no charging filter
                     BranchingFilter::OpenSiteGroupMin(_,_) => None,  // a open or closed site is no charging filter
+                    BranchingFilter::MasterNumberOfCharges(_,_,_,_) => None, // master number of charges does not influence single patterns
+                    BranchingFilter::MasterMustUseColumn(_, _, _) => None // master must use pattern does not influence single patterns
                 }
-            }).collect::<Vec<(&Site,Period,bool)>>();
+            }).collect::<Vec<(SiteIndex,Period,bool)>>();
 
 
             let mut time_filter_site = None;
@@ -254,7 +258,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                     match filter {
                         BranchingFilter::ChargeSegmentSite(_, _, filter_site, typ) => {
                             // if filter asks not to use and sites match or filter asks use and no match
-                            if (!*typ && *filter_site == site.site) || (*typ && *filter_site != site.site)  {
+                            if (!*typ && *filter_site == SiteIndex::new(site.site) || (*typ && *filter_site != SiteIndex::new(site.site)))  {
                                 return true;
                             }
                             false
@@ -262,24 +266,24 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                         BranchingFilter::ChargeSegmentSiteTime(_, _, filter_site, _, typ) => {
                             // if filter asks not to use and sites match or filter asks use and no match
                             // at any time
-                            if (!*typ && *filter_site == site.site) || (*typ && *filter_site != site.site)  {
+                            if (!*typ && *filter_site == SiteIndex::new(site.site)) || (*typ && *filter_site != SiteIndex::new(site.site))  {
                                 return true;
                             }
                             false
                         },
                         BranchingFilter::OpenSite(filter_site,typ) => {
 
-                            if *typ == false && site.site == *filter_site {
+                            if *typ == false && SiteIndex::new(site.site) == *filter_site {
                                 // exlude sites where i have a negative charging filter
                                 return true;
                             }
                             false
                         } // cosed sites should be excluded from dag!
                         BranchingFilter::OpenSiteGroupMax( sites,val) => {
-                            if *val == 0.0 {
+                            if *val == DataFloat::zero() {
                                 // only if we open zero sites in this group we will kill it
                                 for filter_site in sites.iter() {
-                                    if site.site == *filter_site {
+                                    if SiteIndex::new(site.site) == *filter_site {
                                         return true;
                                     }
                                 }
@@ -289,6 +293,8 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                             }
                         }
                         BranchingFilter::OpenSiteGroupMin(_,_) => false,  // a open or closed site is no charging filter
+                        BranchingFilter::MasterNumberOfCharges(_,_,_,_) => false, // master number of charges does not influence single patterns
+                        BranchingFilter::MasterMustUseColumn(_, _, _) => false, // master must use pattern does not influence single patterns
                     }
                 }) {
                     return false;
@@ -334,6 +340,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                         site: Some(site),
                         segment: Some(segment),
                         charge_period: None,
+                        time_period : segment.stop_time
                     }
                 );
 
@@ -373,7 +380,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                     // thus "last_node" is resetted and the next time point will be only directly connected
                     // to the root node again.
 
-                    if time_filters.iter().any(|(s,p,typ)| !typ && *s == site.site && *p == charge_time ) {
+                    if time_filters.iter().any(|(s,p,typ)| !typ && *s == SiteIndex::new(site.site) && *p == charge_time ) {
 
 
                         // since we only allow consecutive charges a gap between two charges is infeasible
@@ -397,6 +404,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
                             site: Some(site),
                             segment: Some(segment),
                             charge_period: Some(charge_time),
+                            time_period : charge_time
                         }
                     );
 
@@ -410,7 +418,7 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
 
                     if let Some(filter_site) = time_filter_site {
 
-                        if *filter_site == site.site {
+                        if *filter_site == SiteIndex::new(site.site) {
                             if charge_time > min_charge {
                                 add_edge_from_start = false;
                             }
@@ -505,205 +513,4 @@ pub fn build_dag <'s, 'a : 's>(vehicle : &'a Vehicle, no_dual : Rc<Cell<f64>>, s
     // save_dag(&format!("vehicle_{}",  vehicle.id), &dag);
 
     (root,destination,dag)
-}
-
-pub fn generate_patterns<'s, 'a>(vehicle : &'a Vehicle, dag : &'s Graph<NodeWeight<'a>, EdgeWeight, petgraph::Directed>, root : NodeIndex, destination : NodeIndex , fixed_dual_cost : f64, exit_early : bool) -> Result<Vec<(f64, f64, Vec<(&'a Segment<'a>, &'a Site,Period)>)>, &'static str>   {
-
-
-    let arena : Arena<Label> = Arena::new();
-
-    // apply resource constrained shortest path algorithm using labels
-    let mut labels_at : Vec<Vec<&Label>> = vec![Vec::with_capacity(1024);dag.node_count()];
-
-    // initialize first label with initial range and initial reduced costs of path
-    let initial_label : &Label = arena.alloc(Label {
-        current_node: root,
-        soc: vehicle.battery_initial_soc(),
-        parent_label: None,
-        collected_edge_duals: 0.0,
-    });
-
-    labels_at[root.index()].push(initial_label);
-
-    let mut unprocessed_labels: Vec<&Label> = Vec::with_capacity(1024);
-    unprocessed_labels.push(initial_label);
-
-
-    'generateLabelsLoop: loop {
-
-        // take unprocessed label from front of vec
-        let process_opt = unprocessed_labels.pop();
-
-        // generate all direct possible child labels that are feasible
-        let potential_next_labels = match process_opt {
-            Some(process) => generate_labels_from_parent(fixed_dual_cost, destination, &vehicle, process, &dag),
-            None => break,
-        };
-
-
-
-
-        // process every possible label
-        for new_label in potential_next_labels {
-
-            // apply some dominance rules to invalidate label
-
-
-            if labels_at[new_label.current_node.index()].iter().any(|existing_label| {
-                (new_label.soc <= existing_label.soc) &&
-                    (/* duals here are negative, thus smaller is worse for reduced costs */ new_label.collected_edge_duals <= existing_label.collected_edge_duals)
-            }) {
-                continue
-            }
-
-
-            // if the label is not dominated (no break/continue before) we add it to the pool
-            let arena_label = arena.alloc(new_label);
-            labels_at[arena_label.current_node.index()].push(arena_label);
-            unprocessed_labels.push(arena_label);
-
-            if exit_early && arena_label.current_node == destination {
-                break 'generateLabelsLoop; // label is good -> exit warly
-            }
-
-        }
-
-
-    }
-
-
-    let atlast = &labels_at[destination.index()];
-
-    if atlast.is_empty() {
-            #[cfg(feature = "column_generation_debug")]
-                println!("No feasible path in vehicle {}", vehicle.id);
-            Err("no feasible path")
-        } else {
-
-
-
-
-
-
-            fn get_and_add_parent(current_label : &Label, nodes : &mut Vec<NodeIndex>)  {
-                nodes.push(current_label.current_node);
-                if let Some(ref parent) = current_label.parent_label {
-                    get_and_add_parent(parent,nodes);
-                }
-            };
-            let labels_with_neg_reduced_cost = atlast.iter()
-                // calculate the reduced costs for each column and filter for negatives
-                .filter_map(| &label| {
-                    let rc =  0.0 /* cost of column (no range cost)*/ - label.collected_edge_duals - fixed_dual_cost;
-                    if rc < - CG_EPSILON {
-                        // recursivly get the path of nodes taken by the last label
-                        let mut nodes : Vec<NodeIndex> = Vec::new();
-                        get_and_add_parent(label,&mut nodes);
-                        nodes.reverse();
-
-                        Some((label.collected_edge_duals, rc, nodes ))
-
-                    } else {
-                        None
-                    }
-                } );
-
-
-
-
-
-            let mut results : Vec<(f64, f64, Vec<(&'a Segment<'a>, &'a Site,Period)>)>  = labels_with_neg_reduced_cost.map(|(collected_range, reduced_costs, nodes)| {
-                (collected_range, reduced_costs, nodes.iter().filter_map(|node| {
-                    let nw : &NodeWeight = &dag[*node];
-                    if let Some(charge_period) = nw.charge_period {
-                        Some((nw.segment.unwrap(), nw.site.unwrap().site,charge_period))
-                    } else {
-                        None
-                    }
-
-                }).collect())
-            }).collect();
-
-
-            // sort first by charging cost, then by remaining range as tiebraker
-            results.sort_unstable_by(|(xr,xc,_),(yr,yc,_)| xc.partial_cmp(&yc).unwrap().then(
-                xr.partial_cmp(&yr).unwrap()
-            ));
-
-
-
-
-            // return results
-            Ok(results)
-
-    }
-
-
-
-}
-
-fn  generate_labels_from_parent <'a> (fixed_dual_costs : f64, destination: NodeIndex, vehicle: &'a Vehicle, parent_label: &'a Label<'a>,
-                                      dag: &'a Graph<NodeWeight, EdgeWeight, petgraph::Directed, u32>) -> impl Iterator<Item=Label<'a>> {
-
-    let labels = dag.edges_directed(parent_label.current_node, petgraph::Direction::Outgoing).into_iter().filter_map(move |edge| {
-
-
-
-        let current = edge.weight();
-
-        let new_collected_edge_duals = parent_label.collected_edge_duals + edge.weight().edge_dual_term.get();
-
-        /*
-                       reduced costs of a column are,  (0.0 /* cost of column (no range cost)*/ - label.collected_edge_duals - fixed_dual_cost) which should be < 0
-                       where label.collected_edge_duals are negative and fixed dual costs always positive,
-                       thus: if -collected_duals > fixed_duals -> can never be negative -> can only get worse later -> never valid
-                       */
-
-        if - new_collected_edge_duals  > fixed_dual_costs {
-            return None
-        }
-
-        // we can charge at most the maximum battery capacity,
-        // as the charging is normally discrete and the range cost is fractional
-        // this min formulation allows to partially use an charge block
-        let new_soc = if current.charge_duration_minutes > 0 {
-            debug_assert!(current.distance_m == 0);
-            vehicle.get_new_soc_after_charging(parent_label.soc, current.charge_duration_minutes)
-        } else {
-            debug_assert!(current.charge_duration_minutes == 0);
-            vehicle.get_new_soc_after_distance(parent_label.soc, current.distance_m)
-        };
-
-
-        if  // have min battery constraint
-            new_soc <  vehicle.battery_min_soc()
-                // have maximum battery constraint
-            || (new_soc >  vehicle.battery_max_soc())
-
-        {
-            return None
-            //println!("Failing max charge");
-        } else if edge.target() == destination {
-            if new_soc < vehicle.battery_min_final_soc() {
-                return None
-            }
-        }
-
-
-
-
-        // TODO: pull down dominance requirements to here to prevent allocating new label
-        // Early examination: The read log is expensive but likely nessesary
-        // Investigate: Since read and write phases do not overlap maybe cheaper data type possibe
-
-        Some(Label {
-            current_node: edge.target(),
-            soc: new_soc,
-            parent_label: Some(parent_label),
-            collected_edge_duals: new_collected_edge_duals,
-        })
-
-    });
-
-    labels
 }

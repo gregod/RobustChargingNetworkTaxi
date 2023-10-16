@@ -1,18 +1,21 @@
 use shared::{Site, Segment, Vehicle, Battery};
 
 
-use std::{io};
+
 extern crate colored;
 use colored::*;
 
 use rust_hawktracer::*;
 
-
-use column_generation::fixed_size::check_feasibility::CheckFeasibility;
+use column_generation::fixed_size::policy_feasibility::PolicyFeasibility;
 use clap::{App, Arg};
 
 
+/// Tests whether a given site plan is infeasible when using the
+/// capacities given
+
 pub fn main() {
+
 
     let instance = HawktracerInstance::new();
     let _listener =  instance.create_listener(HawktracerListenerType::TCP {
@@ -20,7 +23,7 @@ pub fn main() {
         buffer_size: 4096,
     });
 
-    let matches = App::new("Remove Infeasible")
+    let matches = App::new("PolicyFeasible")
 
 
         .arg(Arg::with_name("vehicles")
@@ -62,7 +65,6 @@ pub fn main() {
     let battery_path =matches.value_of("battery").unwrap();
 
 
-
     let sites = Site::load(sites_path);
     let segments = Segment::load(&sites, trips_path);
     let battery = Battery::load(battery_path);
@@ -72,12 +74,17 @@ pub fn main() {
     eprintln!("{}","♞ Loading Data Completed".on_green().bold());
 
 
+    match PolicyFeasibility::has_feasibility_error(&sites, &segments, vehicles)  {
+        None => {
 
-    let feasible_vehicles =  CheckFeasibility::get_potentially_feasible(&sites, &segments, &vehicles);
+            println!("{} IS FEASIBLE", vehicles_path);
+        },
+        Some(solve_error) => {
 
-    Vehicle::output(&feasible_vehicles.into_iter().cloned().collect::<Vec<Vehicle>>(), io::stdout());
+            println!("{} IS NOT FEASIBLE -> {:?}", vehicles_path,solve_error);
+        }
 
-
+    }
 
 
 

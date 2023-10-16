@@ -3,16 +3,23 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 use crate::location::Location;
-use crate::reachable_site::ReachableSite;
-use crate::site::Site;
 use crate::{get_reader, Period};
 
 use indexmap::IndexMap;
 use regex::Regex;
 
+#[derive(Debug,Clone)]
+pub struct ReachableSite {
+    pub site: u8,
+    pub arrival_time: Period,
+    pub departure_time: Period,
+    pub distance_to: u32,
+    pub distance_from: u32,
+}
+
 
 #[derive(Debug,Clone)]
-pub struct Segment<'a> {
+pub struct SegmentIndex {
     pub id: u32,
 
     pub start_location: Location,
@@ -24,11 +31,11 @@ pub struct Segment<'a> {
 
     pub is_free: bool,
 
-    pub reachable_sites: Vec<ReachableSite<'a>>,
+    pub reachable_sites: Vec<ReachableSite>,
 }
 
-impl<'a> Segment<'a> {
-    pub fn load(taxi_sites: &'a IndexMap<u8, Site>, path: &str) -> IndexMap<u32, Segment<'a>> {
+impl SegmentIndex {
+    pub fn load(path: &str) -> IndexMap<u32, Self> {
         let mut trips = IndexMap::default();
         let mut rdr = csv::Reader::from_reader(get_reader(path));
         let header_row = rdr.headers().unwrap();
@@ -117,7 +124,7 @@ impl<'a> Segment<'a> {
                                 as u32;
 
                             ReachableSite {
-                                site: taxi_sites.get(&site_id).unwrap(),
+                                site: site_id,
                                 arrival_time: arrival_period,
                                 departure_time: departure_period,
                                 distance_to: arrival_distance,
@@ -145,7 +152,7 @@ impl<'a> Segment<'a> {
                 .collect();
             let stop_location = Location::new(location_points[0], location_points[1]);
 
-            let trip = Segment {
+            let trip = Self {
                 id: trip_id,
                 start_time,
                 stop_time,
@@ -163,9 +170,9 @@ impl<'a> Segment<'a> {
     }
 }
 
-impl<'a> Eq for Segment<'a> {}
+impl Eq for SegmentIndex {}
 
-impl<'a> Hash for Segment<'a> {
+impl Hash for SegmentIndex {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -175,20 +182,20 @@ impl<'a> Hash for Segment<'a> {
     }
 }
 
-impl<'a> PartialEq for Segment<'a> {
-    fn eq(&self, other: &Segment) -> bool {
+impl PartialEq for SegmentIndex {
+    fn eq(&self, other: &SegmentIndex) -> bool {
         self.id == other.id
     }
 }
 
-impl<'a> Ord for Segment<'a> {
-    fn cmp(&self, other: &Segment) -> Ordering {
+impl Ord for SegmentIndex {
+    fn cmp(&self, other: &SegmentIndex) -> Ordering {
         self.id.cmp(&other.id)
     }
 }
 
-impl<'a> PartialOrd for Segment<'a> {
-    fn partial_cmp(&self, other: &Segment) -> Option<Ordering> {
+impl PartialOrd for SegmentIndex {
+    fn partial_cmp(&self, other: &SegmentIndex) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }

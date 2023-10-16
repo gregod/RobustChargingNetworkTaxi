@@ -80,7 +80,7 @@ pub fn main() {
 
 
 
-    match CheckFeasibility::has_feasibility_error(&sites, &segments, &vehicles, num_infeasible_allowed)  {
+    match CheckFeasibility::has_feasibility_error(&sites, &segments, vehicles, num_infeasible_allowed)  {
         None => {
 
             println!("{} IS FEASIBLE", vehicles_path);

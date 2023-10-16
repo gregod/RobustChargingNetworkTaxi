@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-
+use std::iter::Sum;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use shared::{Simple, Site, Vehicle};
@@ -18,7 +18,7 @@ use rust_hawktracer::*;
 
 use rand::prelude::{StdRng, SliceRandom};
 use rand::{SeedableRng, Rng};
-use gurobi::*;
+use grb::prelude::*;
 
 use std::fs::File;
 use std::io::BufWriter;
@@ -30,83 +30,11 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::io;
 use std::io::BufRead;
 use std::cmp::max;
+use grb::expr::LinExpr;
+use petgraph::visit::Walker;
+use crate::fixed_size::cg_model::VehicleIndex;
 
-
-struct ScenarioManager<'a> {
-    pub branchers : Vec<Brancher<'a>>,
-    pub active_sets : Vec<bool>,
-    pub generation_set : Vec<bool>
-
-}
-
-impl <'a> ScenarioManager<'a> {
-
-    pub fn new(branchers : Vec<Brancher<'a>>) -> Self {
-
-        let active_sets = vec![false;branchers.len()];
-        let generation_set = vec![false;branchers.len()];
-        ScenarioManager{
-            branchers,
-            active_sets,
-            generation_set
-        }
-    }
-
-    pub fn add_brancher_and_activate(&mut self, brancher : Brancher<'a>) {
-        self.branchers.push(brancher);
-        self.active_sets.push(true);
-        self.generation_set.push(true);
-    }
-
-    pub fn new_generation(&mut self) {
-        self.generation_set = vec![false;self.branchers.len()];
-    }
-
-
-    pub fn get_all_branchers(&mut self) -> impl Iterator<Item =  (usize,&mut Brancher<'a>)>{
-        self.branchers.iter_mut().enumerate()
-    }
-
-    pub fn get_active_branchers(&mut self) -> impl Iterator<Item = (usize,&mut Brancher<'a>)>{
-        self.active_sets.iter().zip(self.branchers.iter_mut().enumerate())
-            .filter_map(|(f, b) | {
-                if *f == true {
-                    Some(b)
-                } else {
-                    None
-                }
-            })
-    }
-
-
-    pub fn get_inactive_branchers(&mut self) -> impl Iterator<Item =  (usize,&mut Brancher<'a>)>{
-        self.active_sets.iter().zip(self.branchers.iter_mut().enumerate())
-            .filter_map(|(f, b) | {
-                if *f == false {
-                    Some(b)
-                } else {
-                    None
-                }
-            })
-
-    }
-
-
-
-    pub fn activate(&mut self, index : usize) {
-        self.active_sets[index] = true;
-        self.generation_set[index] =true;
-    }
-
-    pub fn num_active(&self) -> usize {
-        self.active_sets.iter().filter(|x| **x).count()
-    }
-
-    pub fn deactivate(&mut self, index : usize) {
-        self.active_sets[index] = false;
-        self.generation_set[index] = true;
-    }
-}
+use crate::fixed_size::scenario_manager::ScenarioManager;
 
 #[derive(PartialEq)]
 enum SubsetFeasibility {
@@ -132,7 +60,7 @@ pub struct BendersRobust<'a> {
 
     best_cost : u32,
     best_pattern : SiteConf,
-    best_brancher_pattern : Option<ResultPattern<'a>>,
+    best_brancher_pattern : Option<ResultPattern>,
 }
 
 const MAX_FIXED_SIZE: u8 = 4;
@@ -147,7 +75,9 @@ impl<'a> BendersRobust<'a> {
                  max_activate_per_generation : usize,
                  activate_all : bool,
                  iis_activate : bool,
-                 total_num_vehicles : i64
+                 total_num_vehicles : i64,
+        env: &'a Env,
+        env_integer : &'a Env,
                     ) -> Self {
 
         let mut rng: StdRng = StdRng::seed_from_u64(12345);
@@ -160,6 +90,8 @@ impl<'a> BendersRobust<'a> {
             num_sites: site_array.len()
         };
 
+
+
         // create one brancher per vehicle in scenario manager
         let mut scenarion_manager = ScenarioManager::new(
             vehicles_sets.iter().map(|v| {
@@ -167,7 +99,10 @@ impl<'a> BendersRobust<'a> {
                               v,
                               site_conf_factory.empty(),
                               allowed_infeasible,
-                              Arc::new(AtomicBool::new(false))
+                              true,
+                              Arc::new(AtomicBool::new(false)),
+                                &env,
+                    &env_integer
                 )
             }).collect()
         );
@@ -255,7 +190,7 @@ impl<'a> BendersRobust<'a> {
 
 
             #[cfg(feature = "pattern_generation_debug")]
-            println!("FOUND|Accidentially found new feasible");
+            println!("FOUND|Accidentally found new feasible");
             if self.best_cost > pattern_cost {
                 self.best_cost = pattern_cost;
                 self.best_pattern = current_pattern;
@@ -332,14 +267,14 @@ impl<'a> BendersRobust<'a> {
             env.set(param::OutputFlag, 0).unwrap();
 
         // create an empty model which associated with `env`:
-        let mut benders_master = Model::new("benders_master", &env).unwrap();
-        benders_master.set(attr::ModelSense, ModelSense::Minimize.into()).unwrap();
+        let mut benders_master = Model::with_env("benders_master", &env).unwrap();
+        benders_master.set_attr(attr::ModelSense, ModelSense::Minimize).unwrap();
 
         let mut close_sites: IndexMap<u8, Var> = IndexMap::default();
 
         for (idx, site) in self.sites {
             close_sites.insert(*idx,
-                               benders_master.add_var(&format!("closeSite[{}]", idx), Binary, -1.0 * f64::from(site.cost + MAX_FIXED_SIZE * site.charger_cost), 0.0, 1.0, &[], &[]).unwrap()
+                               benders_master.add_var(&format!("closeSite[{}]", idx), Binary, -1.0 * f64::from(site.cost + MAX_FIXED_SIZE * site.charger_cost), 0.0, 1.0, []).unwrap()
             );
         }
 
@@ -351,59 +286,56 @@ impl<'a> BendersRobust<'a> {
         let mut num_cuts: usize = 0;
 
         { // copy cuts from first level
-
-            let file = File::open(cut_file_input).unwrap();
-            let mut lines = io::BufReader::new(file).lines();
-            // first line is bound
-            if let Some(first_line) = lines.next() {
-                // throw away first line!
-                drop(first_line);
-                // we are unsure if we can update the bound here!
-                // as the cuts could come from an cross check
-                // where the cuts are valid but the bound is to optimistic
-
-
-                // rest of the lines are cuts by site id
-                for line in lines {
-                    if let Ok(str_line) = line {
-
-                        // format is site_idx:size_level,site_idx:size_level
-                        // size level must be eq to fixed site size in this fixed size benders!
-                        let sites_in_cut: Vec<usize> = str_line.split(",").map(|a| {
-                            let mut item = a.split(":");
-                            let index = item.next().unwrap();
-                            let size = item.next().unwrap().parse::<u8>().unwrap();
-                            assert_eq!(size, 0);
-                            index.parse::<usize>().unwrap()
-                        }).collect();
-
-                        let constr = benders_master.add_constr(&format!("benderCut[{}]", num_cuts),
-                                                               sites_in_cut.iter().map(|idx| close_sites.get_index(*idx).unwrap()).fold(LinExpr::new(), |a, b| a + b.1)
-                                                               , Less, (sites_in_cut.len() - 1) as f64).unwrap();
+            if cut_file_input != "/dev/null" {
+                let file = File::open(cut_file_input).unwrap();
+                let mut lines = io::BufReader::new(file).lines();
+                // first line is bound
+                if let Some(first_line) = lines.next() {
+                    // throw away first line!
+                    drop(first_line);
+                    // we are unsure if we can update the bound here!
+                    // as the cuts could come from an cross check
+                    // where the cuts are valid but the bound is to optimistic
 
 
-                        active_cuts.push((sites_in_cut.clone(), constr));
-                        tested_cuts.insert(sites_in_cut);
+                    // rest of the lines are cuts by site id
+                    for line in lines {
+                        if let Ok(str_line) = line {
+
+                            // format is site_idx:size_level,site_idx:size_level
+                            // size level must be eq to fixed site size in this fixed size benders!
+                            let sites_in_cut: Vec<usize> = str_line.split(",").map(|a| {
+                                let mut item = a.split(":");
+                                let index = item.next().unwrap();
+                                let size = item.next().unwrap().parse::<u8>().unwrap();
+                                assert_eq!(size, 0);
+                                index.parse::<usize>().unwrap()
+                            }).collect();
+
+                            let constr = benders_master.add_constr(&format!("benderCut[{}]", num_cuts),
+                                                                   c!(
+                                                                       Expr::sum(sites_in_cut.iter().map(|idx| close_sites.get_index(*idx).unwrap().1))
+                                                                   <= (sites_in_cut.len() - 1) as f64)).unwrap();
 
 
-                        num_cuts += 1;
+                            active_cuts.push((sites_in_cut.clone(), constr));
+                            tested_cuts.insert(sites_in_cut);
+
+
+                            num_cuts += 1;
+                        }
                     }
+
+
+                    println!("Loaded {} cuts from external file", num_cuts);
                 }
-
-
-                println!("Loaded {} cuts from external file", num_cuts);
             }
         }
 
 
         // jetzt loopen solange die aktuelle beste lösung ungültig auf dem 
-        // vollen vehicle set is, ggf das optimisation set halt erweitern!
-        
-        // in diesem fall sogar tauschen!, weil ja unabhängig
-        // wenn nur in der benders loop getestet wird, alle anderen
-        // in der cut improvement loop müssen durch das ganze modell
-        // evtl ist das aber schon ganz gut performance improvement!
-        
+        // vollen vehicle set is, ggf das optimisation set erweitern!
+
         
         let mut best_cost : u32 = std::u32::MAX;
         let mut best_pattern :SiteConf = self.site_conf_factory.full(MAX_FIXED_SIZE);
@@ -435,36 +367,33 @@ impl<'a> BendersRobust<'a> {
                     benders_master.optimize().unwrap();
                 }
 
-                
+
                 if benders_master.status().unwrap() != Status::Optimal {
                     panic!("{}", "Error in solving benders master!");
                 }
 
 
-
-                let result : Vec<bool> = benders_master.get_values(attr::X, &close_sites.iter().map(|(_idx,var)| var).cloned().collect::<Vec<Var>>())
+                let result: Vec<bool> = benders_master.get_obj_attr_batch(attr::X, close_sites.iter().map(|(_idx, var)| var).cloned().collect::<Vec<Var>>())
                     .unwrap().iter().map(|el| *el > CG_EPSILON).collect();
 
 
-
-
-                let set_of_closed_sites = result.iter().enumerate().filter(|(_idx,val)| **val).map(|(idx,_val)| idx).collect::<Vec<usize>>();
+                let set_of_closed_sites = result.iter().enumerate().filter(|(_idx, val)| **val).map(|(idx, _val)| idx).collect::<Vec<usize>>();
 
 
                 // create pattern
-                let mut current_pattern :SiteConf = self.site_conf_factory.empty();
-                for (((_idx,el),result_val),site) in current_pattern.iter_mut()
-                        .enumerate()
-                        .zip(result.iter())
-                        .zip(self.sites.iter().map(|(_,site)| site)) {
-                    if ! result_val { // wenn nicht geschlossen
-                        *el = u8::min(site.capacity,MAX_FIXED_SIZE)
+                let mut current_pattern: SiteConf = self.site_conf_factory.empty();
+                for (((_idx, el), result_val), site) in current_pattern.iter_mut()
+                    .enumerate()
+                    .zip(result.iter())
+                    .zip(self.sites.iter().map(|(_, site)| site)) {
+                    if !result_val { // wenn nicht geschlossen
+                        *el = u8::min(site.capacity, MAX_FIXED_SIZE)
                     }
                 }
 
 
                 // test pattern
-                let pattern_cost : u32 = current_pattern.iter().zip(self.sites.iter().map(|(_,site)| site)).map(|(&size, site)| {
+                let pattern_cost: u32 = current_pattern.iter().zip(self.sites.iter().map(|(_, site)| site)).map(|(&size, site)| {
                     if size == 0 {
                         0_u32
                     } else {
@@ -475,25 +404,23 @@ impl<'a> BendersRobust<'a> {
                 {
                     scoped_tracepoint!(_bd_test_configuration);
 
-                    let num_active =  self.scenarion_manager.num_active();
-                    let quorum_required =  (num_active as f32 * (self.quorum_accept_percent as f32 / 100.0)).round() as usize;
+                    let num_active = self.scenarion_manager.num_active();
+                    let quorum_required = (num_active as f32 * (self.quorum_accept_percent as f32 / 100.0)).round() as usize;
 
                     let results = self.scenarion_manager
                         .get_active_branchers()
-                        .map(|(_idx,br)| {
+                        .map(|(_idx, br)| {
                             br.replace_site_sizes(current_pattern.clone());
                             br.solve(false, false)
-                    });
+                        });
 
-                    let mut oracle_ok  = 0;
+                    let mut oracle_ok = 0;
                     let mut oracle_denied = 0;
 
                     for result in results {
                         if result.is_ok() {
-                            println!("Said OK");
                             oracle_ok += 1;
                         } else {
-                            println!("Said FAIL");
                             oracle_denied += 1;
                         }
 
@@ -502,7 +429,7 @@ impl<'a> BendersRobust<'a> {
 
                             // if it is ok we are done!
                             #[cfg(feature = "benders_debug")] {
-                                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost,start_benders.elapsed().as_secs(), true);
+                                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost, start_benders.elapsed().as_secs(), true);
                                 println!("DONE!");
                             }
 
@@ -512,168 +439,150 @@ impl<'a> BendersRobust<'a> {
                             //TODO: SET BEST BRANCHER PATTERN
                             best_brancher_pattern = Vec::new();
                             break 'patternLoop; // we have a good pattern, exit the outer loop
-
                         } else if num_active - oracle_denied < quorum_required { // quorum is not reachable anymore
                             break; // is not feasible, no need to search anymore so "continue" with cut generation
                         }
-
                     }
                 }
 
-                if set_of_closed_sites.len() == 0{
+                if set_of_closed_sites.len() == 0 {
                     panic!("{}", "Opened all sites!");
                 }
 
 
                 #[cfg(feature = "benders_debug")]
-                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost,start_benders.elapsed().as_secs(), false);
-
+                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost, start_benders.elapsed().as_secs(), false);
 
 
                 // since we are infeasible try to generate cuts
+                {
+                    let mut potential_cuts: Vec<Vec<usize>> = Vec::new();
+                    #[cfg(feature = "pattern_generation_improve_cuts")] {
 
-                let mut potential_cuts : Vec<Vec<usize>> = Vec::new();
-                #[cfg(feature = "pattern_generation_improve_cuts")] {
+                        // we will here try to improve the cuts using a heuristic
+                        // the allowed time budget is the same as the time spend
+                        // in the benders_master problem (the harder the problem gets
+                        // the more time do we spend in the heuristics
 
-                    // we will here try to improve the cuts using a heuristic
-                    // the allowed time budget is the same as the time spend
-                    // in the benders_master problem (the harder the problem gets
-                    // the more time do we spend in the heuristics
-
-                   let runtime_benders_master = Duration::from_secs(benders_master.get(gurobi::attr::Runtime).unwrap().round() as u64);
-                   let runtime_cut_loop = max(Duration::from_secs(5),runtime_benders_master);
-
-
-                    // try to generate smaller cut
-                    scoped_tracepoint!(_bd_lift_cuts);
-                    let start_cut_loop = Instant::now();
-                    let mut has_found_improvement = false;
-                    let max_duration_without_improvement = Duration::from_secs(60 * 30);
-
-                    while start_cut_loop.elapsed() < runtime_cut_loop {
+                        let runtime_benders_master = Duration::from_secs(benders_master.get_attr(attr::Runtime).unwrap().round() as u64);
+                        let runtime_cut_loop = max(Duration::from_secs(5), runtime_benders_master);
 
 
-                        if ! has_found_improvement && start_cut_loop.elapsed() > max_duration_without_improvement {
-                            break;
-                        }
+                        // try to generate smaller cut
+                        scoped_tracepoint!(_bd_lift_cuts);
+                        let start_cut_loop = Instant::now();
+                        let mut has_found_improvement = false;
+                        let max_duration_without_improvement = Duration::from_secs(60 * 30);
 
-                        let count_closed_sites = set_of_closed_sites.len();
+                        while start_cut_loop.elapsed() < runtime_cut_loop {
+                            if !has_found_improvement && start_cut_loop.elapsed() > max_duration_without_improvement {
+                                break;
+                            }
+
+                            let count_closed_sites = set_of_closed_sites.len();
 
 
-
-                        let smaller_subset: Vec<usize> = if count_closed_sites > 1 {
-                            let count = if count_closed_sites == 2 {
-                                1 /* gen range does not like min = max */
+                            let smaller_subset: Vec<usize> = if count_closed_sites > 1 {
+                                let count = if count_closed_sites == 2 {
+                                    1 /* gen range does not like min = max */
+                                } else {
+                                    self.rng.gen_range(1..(count_closed_sites - 1))
+                                };
+                                set_of_closed_sites.choose_multiple(&mut self.rng, count).cloned().collect()
                             } else {
-                                self.rng.gen_range(1..(count_closed_sites - 1))
+                                // otherwise just cut single one
+                                set_of_closed_sites.clone()
                             };
-                            set_of_closed_sites.choose_multiple(&mut self.rng, count).cloned().collect()
-                        } else {
-                            // otherwise just cut single one
-                            set_of_closed_sites.clone()
-                        };
 
 
-
-                        // sample again if we already tested this subset!
-                        // set insert returns false if element was already in set
-                        if ! tested_cuts.insert(smaller_subset.clone()) {
-                            continue;
-                        }
-
+                            // sample again if we already tested this subset!
+                            // set insert returns false if element was already in set
+                            if !tested_cuts.insert(smaller_subset.clone()) {
+                                continue;
+                            }
 
 
-
-
-
-                        if ! self.subset_is_feasible(&smaller_subset) {
-                            let mut found_better_level2 = false;
-                            // further strengthen cut
-                            if smaller_subset.len() > 1 {
-                                for _i in 0..2 {
-                                    let mut test_set : Vec<usize> = smaller_subset.choose_multiple(&mut self.rng, max(1, smaller_subset.len() - 2)).cloned().collect();
-                                    while ! self.subset_is_feasible(&test_set) && test_set.len() > 1 {
-                                        potential_cuts.push(test_set.clone());
-                                        found_better_level2 = true;
-                                        test_set = test_set.choose_multiple(&mut self.rng, max(1, test_set.len() - 2)).cloned().collect();
+                            if !self.subset_is_feasible(&smaller_subset) {
+                                let mut found_better_level2 = false;
+                                // further strengthen cut
+                                if smaller_subset.len() > 1 {
+                                    for _i in 0..2 {
+                                        let mut test_set: Vec<usize> = smaller_subset.choose_multiple(&mut self.rng, max(1, smaller_subset.len() - 2)).cloned().collect();
+                                        while !self.subset_is_feasible(&test_set) && test_set.len() > 1 {
+                                            potential_cuts.push(test_set.clone());
+                                            found_better_level2 = true;
+                                            test_set = test_set.choose_multiple(&mut self.rng, max(1, test_set.len() - 2)).cloned().collect();
+                                        }
                                     }
                                 }
+
+                                if !found_better_level2 {
+                                    potential_cuts.push(smaller_subset);
+                                }
+
+                                has_found_improvement = true;
                             }
 
-                            if ! found_better_level2 {
-                                potential_cuts.push(smaller_subset);
+
+                            if count_closed_sites == 1 { // no need to sample multiple if size is already at 1
+                                break
                             }
-
-                            has_found_improvement = true;
-                        }
-
-
-
-                        if count_closed_sites == 1 { // no need to sample multiple if size is already at 1
-                            break
                         }
                     }
+
+
+                    // add cuts to master
+                    if potential_cuts.is_empty() {
+                        potential_cuts.push(set_of_closed_sites);
+                    }
+                    potential_cuts.sort_by(|a, b| a.len().cmp(&b.len()));
+                    'nextPotentialCut: for set_of_closed_sites in potential_cuts.iter().take(50) {
+                        if set_of_closed_sites.is_empty() {
+                            continue 'nextPotentialCut;
+                        }
+
+
+                        // do dominance management
+                        let mut do_skip_this_cut = false;
+
+                        active_cuts.retain(|(cut_pattern, cut_constr)| {
+                            if cut_pattern.len() > set_of_closed_sites.len() {
+                                // if the existing is larger, maybe new dominates old?
+                                if set_of_closed_sites.iter().all(|v| cut_pattern.contains(v)) {
+                                    // new dominates old ! remove old
+                                    benders_master.remove(cut_constr.clone()).unwrap();
+                                    #[cfg(feature = "pattern_generation_debug")]
+                                    println!("Removed cut from master");
+                                    return false;
+                                }
+                            } else {
+                                // if existing is smaller or equal, then maybe it dominates it?
+                                // if equal, then must be different!
+
+                                if cut_pattern.iter().all(|v| set_of_closed_sites.contains(v)) {
+                                    // old dominates new, do not add!
+                                    do_skip_this_cut = true;
+                                    return true
+                                }
+                            }
+                            true
+                        });
+
+                        if do_skip_this_cut {
+                            continue 'nextPotentialCut;
+                        }
+
+                        num_cuts += 1;
+
+                        #[cfg(feature = "pattern_generation_debug")]
+                        println!("Adding cut that not all of {:?} can be set, total : {}", set_of_closed_sites, active_cuts.len());
+                        let constr = benders_master.add_constr(&format!("benderCut[{}]", num_cuts),
+                                                               c!(Expr::sum(set_of_closed_sites.iter().map(|idx| close_sites.get_index(*idx).unwrap().1))
+                                            <= (set_of_closed_sites.len() - 1) as f64)).unwrap();
+
+                        active_cuts.push((set_of_closed_sites.clone(), constr))
+                    };
                 }
-
-
-
-
-
-
-                // add cuts to master
-                if potential_cuts.is_empty() {
-                    potential_cuts.push(set_of_closed_sites);
-                }
-                potential_cuts.sort_by(|a,b| a.len().cmp(&b.len()));
-                'nextPotentialCut: for set_of_closed_sites in potential_cuts.iter().take(50) {
-
-                    if set_of_closed_sites.is_empty() {
-                        continue 'nextPotentialCut;
-                    }
-
-
-                    // do dominance management
-                    let mut do_skip_this_cut = false;
-
-                    active_cuts.retain(|(cut_pattern,cut_constr)| {
-                        if cut_pattern.len() > set_of_closed_sites.len() {
-                            // if the existing is larger, maybe new dominates old?
-                            if set_of_closed_sites.iter().all(|v| cut_pattern.contains(v)) {
-                                // new dominates old ! remove old
-                                benders_master.remove(cut_constr.clone());
-                                #[cfg(feature = "pattern_generation_debug")]
-                                println!("Removed cut from master");
-                                return false;
-                            }
-
-                        } else {
-                            // if existing is smaller or equal, then maybe it dominates it?
-                            // if equal, then must be different!
-
-                            if cut_pattern.iter().all(|v| set_of_closed_sites.contains(v)) {
-                                // old dominates new, do not add!
-                                do_skip_this_cut = true;
-                                return true
-                            }
-                        }
-                        true
-                    });
-
-                    if do_skip_this_cut  {
-                        continue 'nextPotentialCut;
-                    }
-
-                    num_cuts += 1;
-
-                    #[cfg(feature = "pattern_generation_debug")]
-                    println!("Adding cut that not all of {:?} can be set, total : {}",set_of_closed_sites, active_cuts.len());
-                    let constr = benders_master.add_constr(&format!("benderCut[{}]", num_cuts),
-                                            set_of_closed_sites.iter().map(|idx| close_sites.get_index(*idx).unwrap()).fold(LinExpr::new(), |a, b| a + b.1)
-                                            , Less, (set_of_closed_sites.len() - 1) as f64).unwrap();
-
-                    active_cuts.push((set_of_closed_sites.clone(),constr))
-
-                };
             }
 
 
@@ -777,13 +686,13 @@ impl<'a> BendersRobust<'a> {
                     // take only the ones above the benevolent inf level
                     assert!(inf.len() + external_infeasibility_penalty > benevolent_accept_limit_count);
                     let num_inf_above_level = (inf.len()+external_infeasibility_penalty)  - benevolent_accept_limit_count;
-                    let reduced_inf_list : HashSet<usize> = inf.into_iter().take(num_inf_above_level).collect();
+                    let reduced_inf_list : HashSet<VehicleIndex> = inf.into_iter().take(num_inf_above_level).collect();
 
                     // get brancher
                     let brancher_vehicles = self.scenarion_manager.branchers[idx].get_vehicles();
 
                     let  active_map : Vec<bool> = brancher_vehicles.iter().map(|v| {
-                        reduced_inf_list.contains(&v.index)
+                        reduced_inf_list.contains(&VehicleIndex::new(v))
                     }).collect();
 
                     println!("Activating brancher with this list {:?}",&active_map);
@@ -793,8 +702,12 @@ impl<'a> BendersRobust<'a> {
                         brancher_vehicles,
                         active_map,
                         self.site_conf_factory.empty(),
+                        self.scenarion_manager.branchers[0].env,
+                        self.scenarion_manager.branchers[0].env_integer,
                         self.allowed_infeasible,
-                        should_stop.clone()
+                        true,
+                        should_stop.clone(),
+
                     );
 
 
@@ -822,23 +735,27 @@ impl<'a> BendersRobust<'a> {
 
         // write charge processes to file
         {
-            let write_file = File::create(path_charge_process).unwrap();
-            let mut writer = BufWriter::new(&write_file);
+            if path_charge_process != "/dev/null" {
+                let write_file = File::create(path_charge_process).unwrap();
+                let mut writer = BufWriter::new(&write_file);
 
-            for (vehicle, patterns) in best_brancher_pattern {
-                for (_segment, site, time) in patterns {
-                    write!(&mut writer,"{},{},{}\n", vehicle.id, site.id, time).unwrap();
+                for (vehicle, patterns) in best_brancher_pattern {
+                    for (_segment, site, time) in patterns {
+                        write!(&mut writer, "{},{},{}\n", vehicle.index(), site.index(), time).unwrap();
+                    }
                 }
             }
         }
 
         // write cuts to file
         {
-            let write_file = File::create(cut_file_output).unwrap();
-            let mut writer = BufWriter::new(&write_file);
-            write!(&mut writer,"{}\n", best_cost).unwrap();
-            for (cut, _) in active_cuts {
-                    write!(&mut writer,"{}\n", cut.iter().map(|e| format!("{}:0",e)).join(",")).unwrap();
+            if cut_file_output != "/dev/null" {
+                let write_file = File::create(cut_file_output).unwrap();
+                let mut writer = BufWriter::new(&write_file);
+                write!(&mut writer, "{}\n", best_cost).unwrap();
+                for (cut, _) in active_cuts {
+                    write!(&mut writer, "{}\n", cut.iter().map(|e| format!("{}:0", e)).join(",")).unwrap();
+                }
             }
         }
 

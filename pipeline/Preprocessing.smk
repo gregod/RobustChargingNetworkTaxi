@@ -1,4 +1,4 @@
-
+ruleorder: generate_sample_from_feasible_group  > process_trips > resample_capacity_infeasible_vehicles
 
 # Look at the input data and form the input data type groups
 

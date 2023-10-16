@@ -1,6 +1,5 @@
 # the site steps are further used within the clustering scheme to cluster downwards from the max
 site_steps = [20,30,40,50,60,70,80,90,100,110,120,130,140,150]
-ruleorder: generate_sample_from_feasible_group  > process_trips > resample_capacity_infeasible_vehicles
 wildcard_constraints:
     INT_NUM_SITES="\d*", #  int number for site
     NUM_SITES="\d*(|_\w*)", #  number for site

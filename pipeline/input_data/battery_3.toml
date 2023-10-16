@@ -1,0 +1,7 @@
+SOC_min = 0.05
+SOC_max = 0.95
+SOC_initial = 0.50
+SOC_final = 0.50
+range_in_km = 250
+charging_speed = 100.0
+battery_size = 40.0

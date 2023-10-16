@@ -1,7 +1,7 @@
 use crate::site::Site;
 use crate::Period;
 
-#[derive(Debug)]
+#[derive(Debug,Clone,Copy)]
 pub struct ReachableSite<'a> {
     pub site: &'a Site,
     pub arrival_time: Period,

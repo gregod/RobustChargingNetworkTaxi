@@ -24,13 +24,13 @@ sites["capacity"] = line_vector[:len(sites)] # cut of any values larger than num
 
 
 output = io.StringIO()
-spamwriter = csv.writer(output, delimiter=',',
-                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC
-                        )
-spamwriter.writerow(['id', 'capacity', 'cost', 'location', 'lat','lon'])
+csvwriter = csv.writer(output, delimiter=',',
+                       quotechar='"', quoting=csv.QUOTE_NONNUMERIC
+                       )
+csvwriter.writerow(['id', 'capacity', 'cost', 'location', 'lat', 'lon'])
 
 for index,row in sites.iterrows():
     location = row["location"][1:-1].split(", ")
-    spamwriter.writerow([row["id"],row["capacity"],row["cost"],row["location"],float(location[0]),float(location[1])])
+    csvwriter.writerow([row["id"], row["capacity"], row["cost"], row["location"], float(location[0]), float(location[1])])
 
 print(output.getvalue())
