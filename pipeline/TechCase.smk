@@ -125,7 +125,7 @@ rule run_opt_on_tech_group:
         sites=OUTPUT_PREFIX + "/preprocessed/{INT_NUM_SITES}{SUFFIX_DASH}.sites.csv",
         trips = OUTPUT_PREFIX + "/preprocessed/techcase/{SEED}/group_{TYPE_GROUP}/{INT_NUM_SITES}/{NUM_VEHICLES}/base.final.trips.csv.gz",
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
     output:
         stdout=OUTPUT_PREFIX + "/opt/techcase/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/opt_log",
         charge_process=OUTPUT_PREFIX + "/opt/techcase/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/opt_chargeprocess",
@@ -172,7 +172,7 @@ rule techcase_run_FSA_robust:
             GROUP = rob_groups_strat,
         ),
         battery=OUTPUT_PREFIX +"/preprocessed/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/robust2"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
     output:
         stdout=OUTPUT_PREFIX + "/opt/techcase/robust/{INT_NUM_SITES}/{NUM_VEHICLES}/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}/full_opt_log_quorum:{QUORUM_ACCEPT}",
     shell:
@@ -200,7 +200,7 @@ rule run_robust2_tc:
         opt_log_to_vehicles="preprocessing/opt_log_to_vehicles_tc.py",
         opt_log_to_trips="preprocessing/opt_log_to_trips_tc.py",
         opt_log_to_cuts="preprocessing/opt_log_to_cuts.py",
-        binary=OUTPUT_PREFIX + "/binaries/robust2"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
 
     output:
         stdout=OUTPUT_PREFIX + "/opt/techcase/robust/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/{BATTERY}/{SEED_TYPE}_opt_log_quorum:{QUORUM_ACCEPT}_activate:{MAX_ACTIVATE}_benevolent:{BENEVOLENT}_iis:{IIS}"

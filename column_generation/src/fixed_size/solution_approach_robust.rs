@@ -43,7 +43,7 @@ enum SubsetFeasibility {
     UNKNOWN
 }
 
-pub struct BendersRobust<'a> {
+pub struct SolutionApproachRobust<'a> {
     scenarion_manager : ScenarioManager<'a>,
     vehicles_sets: &'a[ &'a [Vehicle<'a>]],
     sites: &'a IndexMap<u8, Site>,
@@ -65,7 +65,7 @@ pub struct BendersRobust<'a> {
 
 const MAX_FIXED_SIZE: u8 = 4;
 
-impl<'a> BendersRobust<'a> {
+impl<'a> SolutionApproachRobust<'a> {
 
     pub fn new(  sites: &'a IndexMap<u8, Site>,
                  vehicles_sets: &'a[ &'a [Vehicle<'a>]],
@@ -109,7 +109,7 @@ impl<'a> BendersRobust<'a> {
         scenarion_manager.new_generation();
 
 
-        BendersRobust {
+        SolutionApproachRobust {
             scenarion_manager,
             vehicles_sets,
             sites,
@@ -227,7 +227,7 @@ impl<'a> BendersRobust<'a> {
 
 
 
-        let start_benders = Instant::now();
+        let start_cutting_plane = Instant::now();
 
 
 
@@ -258,7 +258,7 @@ impl<'a> BendersRobust<'a> {
         // initialize vehicle sets
 
 
-        let mut env = Env::new("/tmp/gurobi_benders.log").unwrap();
+        let mut env = Env::new("/tmp/gurobi_cutting_plane_master.log").unwrap();
         env.set(param::LogToConsole, 0).unwrap();
         env.set(param::Threads, 1).unwrap();
         env.set(param::Seed, 12345).unwrap();
@@ -267,14 +267,14 @@ impl<'a> BendersRobust<'a> {
             env.set(param::OutputFlag, 0).unwrap();
 
         // create an empty model which associated with `env`:
-        let mut benders_master = Model::with_env("benders_master", &env).unwrap();
-        benders_master.set_attr(attr::ModelSense, ModelSense::Minimize).unwrap();
+        let mut cutting_plane_model = Model::with_env("cutting_plane_master", &env).unwrap();
+        cutting_plane_model.set_attr(attr::ModelSense, ModelSense::Minimize).unwrap();
 
         let mut close_sites: IndexMap<u8, Var> = IndexMap::default();
 
         for (idx, site) in self.sites {
             close_sites.insert(*idx,
-                               benders_master.add_var(&format!("closeSite[{}]", idx), Binary, -1.0 * f64::from(site.cost + MAX_FIXED_SIZE * site.charger_cost), 0.0, 1.0, []).unwrap()
+                               cutting_plane_model.add_var(&format!("closeSite[{}]", idx), Binary, -1.0 * f64::from(site.cost + MAX_FIXED_SIZE * site.charger_cost), 0.0, 1.0, []).unwrap()
             );
         }
 
@@ -303,7 +303,7 @@ impl<'a> BendersRobust<'a> {
                         if let Ok(str_line) = line {
 
                             // format is site_idx:size_level,site_idx:size_level
-                            // size level must be eq to fixed site size in this fixed size benders!
+                            // size level must be eq to fixed site size in this fixed size cutting plane!
                             let sites_in_cut: Vec<usize> = str_line.split(",").map(|a| {
                                 let mut item = a.split(":");
                                 let index = item.next().unwrap();
@@ -312,8 +312,8 @@ impl<'a> BendersRobust<'a> {
                                 index.parse::<usize>().unwrap()
                             }).collect();
 
-                            let constr = benders_master.add_constr(&format!("benderCut[{}]", num_cuts),
-                                                                   c!(
+                            let constr = cutting_plane_model.add_constr(&format!("planeCut[{}]", num_cuts),
+                                                                        c!(
                                                                        Expr::sum(sites_in_cut.iter().map(|idx| close_sites.get_index(*idx).unwrap().1))
                                                                    <= (sites_in_cut.len() - 1) as f64)).unwrap();
 
@@ -364,16 +364,16 @@ impl<'a> BendersRobust<'a> {
 
                 {
                     scoped_tracepoint!(_bd_master_optimize);
-                    benders_master.optimize().unwrap();
+                    cutting_plane_model.optimize().unwrap();
                 }
 
 
-                if benders_master.status().unwrap() != Status::Optimal {
-                    panic!("{}", "Error in solving benders master!");
+                if cutting_plane_model.status().unwrap() != Status::Optimal {
+                    panic!("{}", "Error in solving cutting plane master!");
                 }
 
 
-                let result: Vec<bool> = benders_master.get_obj_attr_batch(attr::X, close_sites.iter().map(|(_idx, var)| var).cloned().collect::<Vec<Var>>())
+                let result: Vec<bool> = cutting_plane_model.get_obj_attr_batch(attr::X, close_sites.iter().map(|(_idx, var)| var).cloned().collect::<Vec<Var>>())
                     .unwrap().iter().map(|el| *el > CG_EPSILON).collect();
 
 
@@ -428,8 +428,8 @@ impl<'a> BendersRobust<'a> {
                         if oracle_ok >= quorum_required {
 
                             // if it is ok we are done!
-                            #[cfg(feature = "benders_debug")] {
-                                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost, start_benders.elapsed().as_secs(), true);
+                            #[cfg(feature = "cutting_plane_debug")] {
+                                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost, start_cutting_plane.elapsed().as_secs(), true);
                                 println!("DONE!");
                             }
 
@@ -450,8 +450,8 @@ impl<'a> BendersRobust<'a> {
                 }
 
 
-                #[cfg(feature = "benders_debug")]
-                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost, start_benders.elapsed().as_secs(), false);
+                #[cfg(feature = "cutting_plane_debug")]
+                println!("BEND|{:?}|{}|{}|{}|{:?}", &current_pattern, &pattern_cost, &best_cost, start_cutting_plane.elapsed().as_secs(), false);
 
 
                 // since we are infeasible try to generate cuts
@@ -461,11 +461,11 @@ impl<'a> BendersRobust<'a> {
 
                         // we will here try to improve the cuts using a heuristic
                         // the allowed time budget is the same as the time spend
-                        // in the benders_master problem (the harder the problem gets
+                        // in the cutting_plane_master problem (the harder the problem gets
                         // the more time do we spend in the heuristics
 
-                        let runtime_benders_master = Duration::from_secs(benders_master.get_attr(attr::Runtime).unwrap().round() as u64);
-                        let runtime_cut_loop = max(Duration::from_secs(5), runtime_benders_master);
+                        let runtime_cutting_plane_master = Duration::from_secs(cutting_plane_model.get_attr(attr::Runtime).unwrap().round() as u64);
+                        let runtime_cut_loop = max(Duration::from_secs(5), runtime_cutting_plane_master);
 
 
                         // try to generate smaller cut
@@ -550,7 +550,7 @@ impl<'a> BendersRobust<'a> {
                                 // if the existing is larger, maybe new dominates old?
                                 if set_of_closed_sites.iter().all(|v| cut_pattern.contains(v)) {
                                     // new dominates old ! remove old
-                                    benders_master.remove(cut_constr.clone()).unwrap();
+                                    cutting_plane_model.remove(cut_constr.clone()).unwrap();
                                     #[cfg(feature = "pattern_generation_debug")]
                                     println!("Removed cut from master");
                                     return false;
@@ -576,8 +576,8 @@ impl<'a> BendersRobust<'a> {
 
                         #[cfg(feature = "pattern_generation_debug")]
                         println!("Adding cut that not all of {:?} can be set, total : {}", set_of_closed_sites, active_cuts.len());
-                        let constr = benders_master.add_constr(&format!("benderCut[{}]", num_cuts),
-                                                               c!(Expr::sum(set_of_closed_sites.iter().map(|idx| close_sites.get_index(*idx).unwrap().1))
+                        let constr = cutting_plane_model.add_constr(&format!("benderCut[{}]", num_cuts),
+                                                                    c!(Expr::sum(set_of_closed_sites.iter().map(|idx| close_sites.get_index(*idx).unwrap().1))
                                             <= (set_of_closed_sites.len() - 1) as f64)).unwrap();
 
                         active_cuts.push((set_of_closed_sites.clone(), constr))

@@ -136,7 +136,7 @@ rule run_opt_on_rc:
         trips=OUTPUT_PREFIX + "/preprocessed/realcase/trips.all.{DAY}.csv.gz",
         sites=OUTPUT_PREFIX + "/preprocessed/60.sites.csv",
         battery=OUTPUT_PREFIX +"/preprocessed/realcase/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach"
     output:
         stdout=OUTPUT_PREFIX + "/opt/realcase/{DAY}/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}/opt_log",
         charge_process=OUTPUT_PREFIX + "/opt/realcase/{DAY}/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}/opt_chargeprocess",
@@ -213,7 +213,7 @@ rule run_full_robust:
             DAY=DAY_RANGE
         ),
         battery=OUTPUT_PREFIX +"/preprocessed/realcase/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/robust2"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_robust"
     output:
         stdout=OUTPUT_PREFIX + "/opt/realcase/robust/dbat:{DBAT}_dcha:{DCHAR}_dfin:{DFINAL}/full_opt_log_quorum:{QUORUM_ACCEPT}",
     shell:

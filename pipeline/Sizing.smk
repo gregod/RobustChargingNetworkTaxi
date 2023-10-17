@@ -28,7 +28,7 @@ rule run_opt_on_group:
         sites=INPUT_PREFIX + "/preprocessed/{INT_NUM_SITES}{SUFFIX_DASH}.sites.csv",
         trips = INPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{INT_NUM_SITES}/{NUM_VEHICLES}/{BATTERY}.final.trips.csv.gz",
         battery=INPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach"
     output:
         stdout=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/{SIZE_START}-{SIZE_FINAL}/opt_log",
         charge_process=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/{SIZE_START}-{SIZE_FINAL}/opt_chargeprocess",
@@ -41,15 +41,3 @@ rule run_opt_on_group:
 
 
 
-
-
-rule build_benders_binary:
-    threads: 1
-    resources:
-             cargo=1
-    input:
-         cargo="/home/gregor/Code/et/column_generation/src/bin/benders.rs"
-    output:
-          OUTPUT_PREFIX + "/binaries/benders"
-    shell:
-         "RUSTFLAGS='-C link-arg=-s -C target-cpu=native' cargo +nightly build -Z unstable-options -j 1 --profile=cluster --features='snakemake,profiling_enabled' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin benders --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"

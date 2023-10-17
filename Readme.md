@@ -45,9 +45,9 @@ The file `column_generation/Cargo.toml` includes a variety of static feature tog
 is provided via the hawktrace library. The `shared` crate contains generic structs such as instance loading and battery calculations.
 
 The main optimization functionality has been consolidated into the
-binary `benders_variable` (named so for historical reasons), which is the main entry point for all optimization variants.
+binary `solution_approach_variable`, which is the main entry point for all optimization variants.
 The file `cg_model.rs` contains the restricted master problem, `dag_builder.rs` the pricing problem graph,
-`brancher.rs` the branching tree, and `benders_variable.rs` the outer cutting plane algorithm and robust solution framework.
+`brancher.rs` the branching tree, and `solution_approach_variable.rs` the outer cutting plane algorithm and robust solution framework.
 Note that some parts of the robust solution process, such as the selection of seed scenarios, are managed by the Snakemake Workflow.
 
 

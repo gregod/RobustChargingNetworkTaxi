@@ -2,36 +2,36 @@ OUTPUT_PREFIX="/mnt/dataHDD/split_days/cluster_binaries"
 
 rule all:
     input:
-        OUTPUT_PREFIX + "/benders",
-        OUTPUT_PREFIX + "/robust2",
-        OUTPUT_PREFIX + "/bendersVar",
+        OUTPUT_PREFIX + "/solution_approach",
+        OUTPUT_PREFIX + "/solution_approach_robust",
+        OUTPUT_PREFIX + "/solution_approach_variable",
         OUTPUT_PREFIX + "/check_feasibility",
         OUTPUT_PREFIX + "/check_cross_feasibility",
         OUTPUT_PREFIX + "/remove_infeasible"
 
 
 
-rule build_benders_binary:
+rule build_binary:
     threads: 1
     resources:
              cargo=1
     input:
-         cargo="/home/gregor/Code/et/column_generation/src/bin/benders.rs"
+         cargo="/home/gregor/Code/et/column_generation/src/bin/solution_approach.rs"
     output:
-          OUTPUT_PREFIX + "/benders"
+          OUTPUT_PREFIX + "/solution_approach"
     shell:
-         "RUSTFLAGS='-C target-cpu=native' cargo build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin benders --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
+         "RUSTFLAGS='-C target-cpu=native' cargo build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin solution_approach --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
 
 rule build_robust_binary:
     threads: 1
     resources:
              cargo=1
     input:
-         cargo="/home/gregor/Code/et/column_generation/src/bin/robust2.rs"
+         cargo="/home/gregor/Code/et/column_generation/src/bin/solution_approach_robust.rs"
     output:
-          OUTPUT_PREFIX + "/robust2"
+          OUTPUT_PREFIX + "/solution_approach_robust"
     shell:
-         "RUSTFLAGS='-C target-cpu=native' cargo build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin robust2 --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
+         "RUSTFLAGS='-C target-cpu=native' cargo build -Z unstable-options -j 1 --profile=cluster --features='snakemake' --manifest-path /home/gregor/Code/et/column_generation/Cargo.toml --no-default-features --bin solution_approach_robust --target-dir {OUTPUT_PREFIX}/target/ --out-dir $(dirname {output})"
 
 
 rule build_check_feasibility_binary:

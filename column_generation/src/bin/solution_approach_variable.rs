@@ -9,7 +9,7 @@ use colored::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool};
 
-use column_generation::fixed_size::benders_variable::Benders;
+use column_generation::fixed_size::solution_approach_variable::SolutionApproachVariable;
 use std::time::{Instant};
 use clap::{App, Arg};
 use grb::{Env,param};
@@ -282,7 +282,7 @@ pub fn main() {
     env_integer.set(param::TimeLimit, 60.0).unwrap();
 
 
-    let mut seq = Benders::new(
+    let mut seq = SolutionApproachVariable::new(
         num_sites,num_infeasible_allowed, sites.clone(), &input_data, workers, true, quorum_accept_percent, benevolent_accept_percent, max_activate_per_generation,
         matches.is_present("activate_all"),
         matches.value_of("activate_iis").unwrap().parse::<bool>().unwrap(), total_num_vehicles,

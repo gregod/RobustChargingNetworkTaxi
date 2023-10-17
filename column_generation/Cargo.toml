@@ -40,7 +40,7 @@ opt=["column_generation_exit_early",
     "column_generation_sometimes_integer",
     "pattern_generation_improve_cuts"]
 
-snakemake=["opt","benders_debug"]
+snakemake=["opt","cutting_plane_debug"]
 profiling_enabled = ["rust_hawktracer/profiling_enabled"]
 perf_statistics=["shared/perf_statistics","profiling_enabled","dipstick"]
 
@@ -64,8 +64,8 @@ column_generation_debug=["expensive_feasibility_checks","branching_debug"]
 expensive_feasibility_checks=["column_generation_validate"]
 column_generation_validate=[]
 branching_debug=[]
-benders_debug=[]
-benders_lifting_debug=[]
+cutting_plane_debug=[]
+cutting_plane_lifting_debug=[]
 chunk_debug=[]
 
 progress_icons = []

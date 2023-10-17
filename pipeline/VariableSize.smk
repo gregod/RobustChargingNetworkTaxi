@@ -9,7 +9,7 @@ rule run_variable_opt_on_group:
         trips = OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{INT_NUM_SITES}/{NUM_VEHICLES}/{BATTERY}.final.trips.csv.gz",
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
         cuts=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/opt_cuts",
-        binary=OUTPUT_PREFIX + "/binaries/benders_variable"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
     output:
         stdout=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/variable_opt_log",
         charge_process=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/variable_opt_chargeprocess",
@@ -30,7 +30,7 @@ rule run_variable_opt_on_group_no_cuts:
         sites=OUTPUT_PREFIX + "/preprocessed/{INT_NUM_SITES}{SUFFIX_DASH}.sites.csv",
         trips = OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{INT_NUM_SITES}/{NUM_VEHICLES}/{BATTERY}.final.trips.csv.gz",
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders_variable"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
     output:
         stdout=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/variable_no_cuts_opt_log",
         charge_process=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{INT_NUM_SITES}{SUFFIX_DASH}/{NUM_VEHICLES}/variable_no_cuts_opt_chargeprocess",

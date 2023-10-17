@@ -157,7 +157,7 @@ rule run_opt_on_group_strat:
         sites=OUTPUT_PREFIX + "/preprocessed/strat:{SITE_STRATEGY}.sites.csv",
         trips=OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{NUM_VEHICLES}/{SITE_STRATEGY}/fixed.trips.csv.gz",
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach"
     output:
         stdout=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{SITE_STRATEGY}/{NUM_VEHICLES}/opt_log",
         charge_process=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/tol{TOLERANCE}/{SITE_STRATEGY}/{NUM_VEHICLES}/opt_chargeprocess",
@@ -194,7 +194,7 @@ rule run_robust2_full_strat:
         vehicles=expand(OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{{NUM_VEHICLES}}/{{SITE_STRATEGY}}/{{BATTERY}}.feasible.vehicles.csv.gz", SEED=rob_seeds_strat, TYPE_GROUP=rob_groups_strat),
         trips=expand(OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{{NUM_VEHICLES}}/{{SITE_STRATEGY}}/fixed.trips.csv.gz", SEED=rob_seeds_strat, TYPE_GROUP=rob_groups_strat),
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/robust2"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_robust"
 
     output:
         stdout=OUTPUT_PREFIX + "/opt/robust/{BATTERY}/{SITE_STRATEGY}/{NUM_VEHICLES}/full_opt_log_quorum:{QUORUM_ACCEPT}",
@@ -251,7 +251,7 @@ rule run_robust2_srat:
         opt_log_to_vehicles="preprocessing/opt_log_to_vehicles_strat.py",
         opt_log_to_trips="preprocessing/opt_log_to_trips_strat.py",
         opt_log_to_cuts="preprocessing/opt_log_to_cuts.py",
-        binary=OUTPUT_PREFIX + "/binaries/robust2"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_robust"
 
     output:
         stdout=OUTPUT_PREFIX + "/opt/robust/{BATTERY}/{SITE_STRATEGY}/{NUM_VEHICLES}/{SEED_TYPE}_opt_log_quorum:{QUORUM_ACCEPT}_activate:{MAX_ACTIVATE}_benevolent:{BENEVOLENT}_iis:{IIS}",
@@ -273,7 +273,7 @@ rule run_robust2_srat_withvehicle_count:
         opt_log_to_vehicles="preprocessing/opt_log_to_vehicles_strat.py",
         opt_log_to_trips="preprocessing/opt_log_to_trips_strat.py",
         opt_log_to_cuts="preprocessing/opt_log_to_cuts.py",
-        binary=OUTPUT_PREFIX + "/binaries/robust2"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_robust"
 
     output:
         stdout=OUTPUT_PREFIX + "/opt/robust/{BATTERY}/{SITE_STRATEGY}/{NUM_VEHICLES}/{SEED_TYPE}_opt_log_quorum:{QUORUM_ACCEPT}_activate:{MAX_ACTIVATE}_benevolent:{BENEVOLENT}_on:vehicles_iis:{IIS}",

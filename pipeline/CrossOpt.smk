@@ -43,7 +43,7 @@ rule run_column_generation_on_cross_site_bucket:
          trips=OUTPUT_PREFIX +"/cross/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/cross.trips.csv",
          battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
          cuts= OUTPUT_PREFIX +"/opt/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/opt_cuts",
-         binary=OUTPUT_PREFIX + "/binaries/benders"
+         binary=OUTPUT_PREFIX + "/binaries/solution_approach"
     output:
           stdout=OUTPUT_PREFIX + "/cross/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/cross_opt_log",
           charge_process=OUTPUT_PREFIX + "/cross/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/cross_opt_chargeprocess",
@@ -66,7 +66,7 @@ rule run_var_column_generation_on_cross_site_bucket:
          battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
          cuts= OUTPUT_PREFIX +"/opt/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/var_opt_cuts",
          trips=OUTPUT_PREFIX +"/cross/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/var_cross.trips.csv",
-         binary=OUTPUT_PREFIX + "/binaries/bendersVar"
+         binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
     output:
           stdout=OUTPUT_PREFIX + "/cross/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/var_cross_opt_log",
           charge_process=OUTPUT_PREFIX + "/cross/{NUM_SITES}/{time_bucket}/{BATTERY}/tol{TOLERANCE}/var_cross_opt_chargeprocess",

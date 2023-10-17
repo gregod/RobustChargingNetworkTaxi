@@ -23,7 +23,7 @@ rule run_opt_on_group:
         sites=OUTPUT_PREFIX + "/preprocessed/{INT_NUM_SITES}.sites.csv",
         trips = OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{INT_NUM_SITES}/{NUM_VEHICLES}/{BATTERY}.final.trips.csv.gz",
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders_variable"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
     output:
         stdout=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/{INT_NUM_SITES}/{SITE_SIZE}/{NUM_VEHICLES}/opt_log",
         cuts=OUTPUT_PREFIX + "/opt/{SEED}/group_{TYPE_GROUP}/{BATTERY}/{INT_NUM_SITES}/{SITE_SIZE}/{NUM_VEHICLES}/opt_cuts"

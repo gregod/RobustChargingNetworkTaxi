@@ -14,7 +14,7 @@ rule run_robust_full_strat:
         vehicles=expand(OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{{INT_NUM_SITES}}/{{NUM_VEHICLES}}/{{BATTERY}}.final.vehicles.csv.gz", SEED=rob_seeds_strat, TYPE_GROUP=rob_groups_strat),
         trips=expand(OUTPUT_PREFIX + "/preprocessed/{SEED}/group_{TYPE_GROUP}/{{INT_NUM_SITES}}/{{NUM_VEHICLES}}/{{BATTERY}}.final.trips.csv.gz", SEED=rob_seeds_strat, TYPE_GROUP=rob_groups_strat),
         battery=OUTPUT_PREFIX +"/preprocessed/{BATTERY}.toml",
-        binary=OUTPUT_PREFIX + "/binaries/benders_variable"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
 
     output:
         stdout=OUTPUT_PREFIX + "/opt/robust/{BATTERY}/{INT_NUM_SITES}{SUFFIX_DASH}/{SITE_SIZE}/{NUM_VEHICLES}/full_opt_log_quorum:{QUORUM_ACCEPT}",
@@ -70,7 +70,7 @@ rule run_robust_strategy:
         opt_log_to_vehicles="preprocessing/opt_log_to_vehicles.py",
         opt_log_to_trips="preprocessing/opt_log_to_trips.py",
         opt_log_to_cuts="preprocessing/opt_log_to_cuts.py",
-        binary=OUTPUT_PREFIX + "/binaries/benders_variable"
+        binary=OUTPUT_PREFIX + "/binaries/solution_approach_variable"
 
     output:
         stdout=OUTPUT_PREFIX + "/opt/robust/{BATTERY}/{INT_NUM_SITES}{SUFFIX_DASH}/{SITE_SIZE}/{NUM_VEHICLES}/{SEED_TYPE}_opt_log_quorum:{QUORUM_ACCEPT}_activate:{MAX_ACTIVATE}_benevolent:{BENEVOLENT}_iis:{IIS}",
