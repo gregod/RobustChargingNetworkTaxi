@@ -1,6 +1,8 @@
 #  Robust Charging Network Planning for Metropolitan Taxi Fleets
 
-This repository contains the code and preprocessing pipelines for the Paper CITE "Robust Charging Network Planning for Metropolitan Taxi Fleets".
+This repository contains the code and preprocessing pipelines for the Paper:
+
+*Godbersen, Gregor, Rainer Kolisch and Maximilian Schiffer. “Robust Charging Network Planning for Metropolitan Taxi Fleets.” (2022).* [https://arxiv.org/abs/2209.07305](https://arxiv.org/abs/2209.07305)
 
 
 ## Architecture
